@@ -1,0 +1,89 @@
+CONTENTS
+  -  Initial Setup
+  -  How to setup slave database for the first time
+  -  How to build dbtest docker image with the latest database backup
+  -  How to import data in dbtest container
+  -  How to manually backup data on the slave server
+
+// ===============================================
+// Initial setup
+// ===============================================
+There are three docker images provided, in order to get started an admin
+would run the avidshiau/hudlproject/dbprod_master image and then the 
+avidshiau/hudlproject/dbprod_slave image.  For the latter, additional 
+setup is needed in "How to setup slave database for the first time" section.
+The dbprod_slave server will automatically syncronize with the
+dbprod_master server.  The dbprod_slave containter in addition to running
+the slave mysql server also runs a daily backup service to stop the server,
+dump the database to the local folder /mysqlbackups/<timestamp>.sql.  This
+file is input for the 3rd docker image provided avidshiau/hudlproject/dbtest,
+which can be built with it and the latest version distributed to users.
+
+Note:  When producing dbtest images, it will be necessary to clone the 
+hudlproject repo and set the HUDLPROJECTROOT env variable as appropriate. 
+
+// ===============================================
+// How to setup slave database for the first time.
+// ===============================================
+If the master has been running for some time, it will be necessary 
+to lock the database and dump the current database and then unlock it.
+Otherwise if the master database is new the dump created automatically can
+be used to seed the slave.
+
+1.) Enter the docker container running mysql on the host
+   e.g. docker exec -it <hash> bash
+2.) Run the backup script /scripts/dump_master.sh.  The script will output
+   the dump to /mysqldumps/<timestamp>.sql
+3.) Exit the docker container and copy the dump to the host
+   e.g. docker cp <hash>:/mysqldumps/<timestamp>.sql <path to location on host>
+4.) Start the slave container
+   e.g. docker run -p 3307:3307 avidshiau/hudlproject/dbprod_slave:1.00
+5.) Copy the backup to the slave container
+   e.g. docker cp <path to location on host> <hash>:/mysqldumps
+6.) Gather the following information from the host
+  a.) IP address
+  b.) Admin password for the slave 
+     e.g. docker logs <hash for container running slave>
+7.) Gather the following information from the mysql dump file
+  a.) MASTER_LOG_FILE value e.g. mysql-bin.000003
+  b.) MASTER_LOG_POS value e.g. 1154
+  c.) Password for the slave account on the master mysql database
+8.) Enter the docker cotainer for the slave sql database and import the backup
+    database
+    e.g. /usr/bin/mysql -u admin -p users < /mysqldumps/<timestampe>.sql
+9.) Enter the mysql console and setup the slave configuration
+    e.g. /usr/bin/mysql -u admin -p
+    e.g. CHANGE MASTER TO MASTER_HOST='<ip of master db>',MASTER_USER='<slaveusername>', MASTER_PASSWORD='<slavepassword>', MASTER_LOG_FILE='<binary log file name>', MASTER_LOG_POS=  <binary log file position>;
+10.) Start the slave
+    e.g. start slave;
+
+// =================================================================
+// How to build dbtest docker image with the latest database backup
+// =================================================================
+The container host can download the latest backup from the dbprod_slave 
+container, update the local git repo by adding the latest backup and then 
+running the docker build command on the Dockerfile in the dbtest folder to
+generate the latest image and remove any previous images.
+1.) Ensure that the slave database container is running
+2.) On the host run the script found HUDLPROJECTROOT/scripts/import_database.sh
+3.) The script will download the latest db backup from the slave mysql server
+   and package it in a dbtest container
+4.) When ready the latest dbtest container can be pushed
+
+// =======================================
+// How to import data in dbtest container
+// =======================================
+The latest version of the avidshiau/hudlproject/dbtest container will include
+the most recent database backup.  To import it simply run the following
+command.
+1.) mysql -u admin -p users < /databases/<name of databasefile>
+  The admin password can be obtained by inspecting the docker log for the
+  container.
+
+// ================================================
+// How to manually backup data on the slave server
+// ================================================
+The data can be manually backed up by running the same script listed in
+crontab.
+1.) Enter the docker container running dbprod_slave image on the docker host
+2.) Run /script/backup_data.sh

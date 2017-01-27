@@ -1,0 +1,3 @@
+0 12 * * * root /scripts/backup_data.sh >> /var/log/cron.log 2>&1
+
+
