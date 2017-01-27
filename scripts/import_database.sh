@@ -12,5 +12,5 @@ if [ -d "$HUDLPROJECTROOT/dbtest/databases/latest" ]; then
 fi
 docker cp "$SLAVESHA:/mysqlbackups/latest" "$HUDLPROJECTROOT/dbtest/databases"
 sudo chmod -R 777 "$HUDLPROJECTROOT/dbtest/databases/latest"
-docker build --rm -t avidshiau/hudlproject/dbtest "$HUDLPROJECTROOT/dbtest"
+docker build --rm -t avidshiau/hudlproject/dbtest "$HUDLPROJECTROOT:dbtest"
 
